@@ -10,6 +10,7 @@ from light_classification.tl_classifier import TLClassifier
 import tf
 import cv2
 import math
+import numpy as np
 from traffic_light_config import config
 
 STATE_COUNT_THRESHOLD = 3
@@ -20,12 +21,14 @@ class TLDetector(object):
 
         self.pose = None
         self.waypoints = None
+        self.num_waypoints = 0
         self.camera_image = None
         self.lights = []
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
-        sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        #sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
+        self.base_waypoints_sub = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         '''
         /vehicle/traffic_lights helps you acquire an accurate ground truth data source for the traffic light
         classifier, providing the location and current color state of all traffic lights in the
@@ -37,6 +40,8 @@ class TLDetector(object):
         sub6 = rospy.Subscriber('/camera/image_raw', Image, self.image_cb)
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
+
+        self.test_image = rospy.Publisher('/test_image', Image, queue_size=1)
 
         self.bridge = CvBridge()
         self.light_classifier = TLClassifier()
@@ -54,6 +59,8 @@ class TLDetector(object):
 
     def waypoints_cb(self, waypoints): # type: Lane
         self.waypoints = waypoints
+        self.num_waypoints = len(self.waypoints.waypoints)
+        self.base_waypoints_sub.unregister()
 
     def traffic_cb(self, msg):
         self.lights = msg.lights
@@ -69,6 +76,43 @@ class TLDetector(object):
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
+
+        self.camera_image.encoding = "rgb8"
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+
+        output = cv_image.copy()
+        gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+
+        hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
+        luminosity = hsv[:,:,2]
+        hue = hsv[:,:,0]
+
+        # detect circles in the image
+        circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT,1,50,
+                            param1=30,param2=20,minRadius=5,maxRadius=30)
+         
+        # ensure at least some circles were found
+        if circles is not None:
+            # convert the (x, y) coordinates and radius of the circles to integers
+            circles = np.round(circles[0, :]).astype("int")
+         
+            # loop over the (x, y) coordinates and radius of the circles
+            for (x, y, r) in circles:
+                # draw the circle in the output image, then draw a rectangle
+                # corresponding to the center of the circle
+                # https://stackoverflow.com/questions/10948589/choosing-correct-hsv-values-for-opencv-thresholding-with-inranges
+                if (luminosity[y,x] > 180):
+                    # if (hue[y,x]<40 or hue[y,x]>300):
+                    if (hue[y,x]<85 or hue[y,x]>150):
+                        cv2.circle(output, (x, y), r, (255, 0, 0), 3)
+                
+        # output = np.hstack([cv_image, output])
+
+        # http://wiki.ros.org/cv_bridge/Tutorials/ConvertingBetweenROSImagesAndOpenCVImagesPython
+        img = self.bridge.cv2_to_imgmsg(output, "bgr8")
+
+        # for debugging purposes - use 'rqt_image_view' in a separate terminal to see the image
+        self.test_image.publish(img) 
 
         '''
         Publish upcoming red lights at camera frequency.
