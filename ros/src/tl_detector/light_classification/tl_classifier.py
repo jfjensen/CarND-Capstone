@@ -97,7 +97,7 @@ class TLClassifier(object):
         
         # for debugging purposes - use 'rqt_image_view' in a separate terminal to see the image
         # self.test_image.publish(img)
-        rospy.loginfo("""Lights detected {}""".format(lights_detected))
+        # rospy.loginfo("""Lights detected {}""".format(lights_detected))
 
 
 

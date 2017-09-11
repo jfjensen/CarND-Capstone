@@ -146,7 +146,7 @@ class WaypointUpdater(object):
         dist_curr = dl(waypoints[closest_waypoint].pose.pose.position, pose.position)
         dist_next = dl(waypoints[closest_waypoint+1].pose.pose.position, pose.position)
 
-        rospy.loginfo("""Waypoint dist {} {} {}""".format(dist_prev, dist_curr, dist_next))
+        # rospy.loginfo("""Waypoint dist {} {} {}""".format(dist_prev, dist_curr, dist_next))
 
         return closest_waypoint
 
