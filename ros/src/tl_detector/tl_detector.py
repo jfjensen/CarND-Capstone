@@ -236,7 +236,7 @@ class TLDetector(object):
                     closest_light_position = light_position
 
             # if the traffic light is within a distance of '50' then process the pose
-            if closest_light_distance < 50:
+            if closest_light_distance < 80:
                 light_pose = Pose()
                 light_pose.position.x = closest_light_position[0]
                 light_pose.position.y = closest_light_position[1]
