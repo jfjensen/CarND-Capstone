@@ -54,7 +54,8 @@ class DBWNode(object):
         vc.vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         vc.fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
         vc.brake_deadband = rospy.get_param('~brake_deadband', .1)
-        vc.decel_limit = rospy.get_param('~decel_limit', -5)
+        vc.brake_factor = rospy.get_param('~brake_factor', 5.0)
+        vc.decel_limit = rospy.get_param('~decel_limit', -1.)
         vc.accel_limit = rospy.get_param('~accel_limit', 1.)
         vc.wheel_radius = rospy.get_param('~wheel_radius', 0.2413)
         vc.wheel_base = rospy.get_param('~wheel_base', 2.8498)
@@ -72,12 +73,18 @@ class DBWNode(object):
 
         #self.controller = Controller(kp=0.4, ki=0.0, kd=0.5, vc=vc) # working: car stays on track, but throttle oscillates a lot
         # self.controller = Controller(kp=0.2, ki=0.001, kd=0.15, vc=vc) # sort of OK
-        # self.controller = Controller(kp=0.8, ki=0.005, kd=0.5, vc=vc) # better
-        # self.controller = Controller(kp=0.8, ki=0.005, kd=0.5, vc=vc) # fine
-        # self.controller = Controller(kp=1.2, ki=0.005, kd=0.5, vc=vc) # fine
-        self.controller = Controller(kp=1.0, ki=0.005, kd=0.3, vc=vc) # fine ++
-        # self.controller = Controller(kp=1.0, ki=0.004, kd=0.2, vc=vc) # fine
-        # self.controller = Controller(kp=1.0, ki=0.005, kd=0.1, vc=vc) # fine
+        # self.controller = Controller(kp=0.1, ki=0.0, kd=0.05, vc=vc) # fits expectation better
+        # self.controller = Controller(kp=0.1, ki=0.0, kd=0.03, vc=vc) # fits expectation even better
+        # self.controller = Controller(kp=0.1, ki=0.0, kd=0.02, vc=vc) # fits expectation even better - car overshoots
+        # self.controller = Controller(kp=0.1, ki=0.0, kd=0.025, vc=vc) # good
+        # self.controller = Controller(kp=0.15, ki=0.001, kd=0.025, vc=vc) #
+        # self.controller = Controller(kp=0.9, ki=0.0, kd=0.0, vc=vc) # good
+        # self.controller = Controller(kp=1.0, ki=0.0, kd=0.0, vc=vc) #
+        # self.controller = Controller(kp=1.6, ki=0.0, kd=0.01, vc=vc) # good
+        # self.controller = Controller(kp=1.6, ki=0.0, kd=0.04, vc=vc) # good ++++++++++++++
+        # self.controller = Controller(kp=1.6, ki=0.00005, kd=0.04, vc=vc) # good ++++++++++++
+        self.controller = Controller(kp=1.6, ki=0.00001, kd=0.04, vc=vc) # good
+
 
 
         self.dbw_enabled = False
@@ -92,7 +99,7 @@ class DBWNode(object):
         self.loop()
 
     def set_dbw_enabled(self, dbw_enabled):
-        self.dbw_enabled = dbw_enabled
+        self.dbw_enabled = dbw_enabled.data
 
     def set_current_velocity(self, current_velocity):
         self.current_velocity = current_velocity
@@ -109,9 +116,9 @@ class DBWNode(object):
 
             if self.dbw_enabled and self.current_velocity is not None and self.latest_twist_cmd is not None:
                 if not self.controller_reset:
+                    rospy.loginfo('Resetting DBW controller.')
                     self.controller.reset()
                     self.controller_reset = True
-
 
                 # TODO re-add this output
                 #rospy.loginfo("""Velocity Ref: {} - Curr: {} - Err: {}""".format(self.ref_velocity, self.current_velocity, velocity_error))
@@ -142,7 +149,7 @@ class DBWNode(object):
         #if (brake > 0.0):
         bcmd = BrakeCmd()
         bcmd.enable = True
-        bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
+        bcmd.pedal_cmd_type = BrakeCmd.CMD_PERCENT
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
 
